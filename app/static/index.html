@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice AI Test</title>
+</head>
+<body>
+    <!DOCTYPE html>
+
+<html>
+<head>
+    <title>Voice AI Live</title>
+</head>
+<body>
+
+
+    <h2>🎤 Voice Assistant (Live Mode)</h2>
+    <button onclick="startListening()">Start Listening</button>
+
+    <canvas id="waveform" width="400" height="100"></canvas>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let silenceTimer;
+        let audioPlayer = new Audio();
+
+        const ws = new WebSocket("ws://127.0.0.1:8000/ws/voice");
+
+        ws.onmessage = async (event) => {
+            const audioBlob = new Blob([event.data], { type: "audio/mp3" });
+            const url = URL.createObjectURL(audioBlob);
+
+            const audio = new Audio(url);
+            audio.play();  // 🔥 AUTO PLAY
+        };
+
+        async function startListening() {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    noiseSuppression: true,
+                    echoCancellation: true,
+                    autoGainControl: true
+                }
+            });
+
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            visualize(analyser);
+
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.start();
+
+            detectSilence(analyser);
+        }
+
+        function detectSilence(analyser) {
+            const data = new Uint8Array(analyser.fftSize);
+
+            function check() {
+                analyser.getByteTimeDomainData(data);
+
+                const isSilent = data.every(v => v < 128 + 5 && v > 128 - 5);
+
+                if (isSilent) {
+                    if (!silenceTimer) {
+                        silenceTimer = setTimeout(() => {
+                            stopAndSend();
+                        }, 1500);
+                    }
+                } else {
+                    clearTimeout(silenceTimer);
+                    silenceTimer = null;
+
+                    // 🔥 interrupt AI voice if user speaks
+                    audioPlayer.pause();
+                }
+
+                requestAnimationFrame(check);
+            }
+
+            check();
+        }
+
+        function stopAndSend() {
+            mediaRecorder.stop();
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                audioChunks = [];
+
+                // send via websocket
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                ws.send(arrayBuffer);
+
+                // restart recording (continuous loop)
+                startListening();
+            };
+        }
+
+        function visualize(analyser) {
+            const canvas = document.getElementById("waveform");
+            const ctx = canvas.getContext("2d");
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            function draw() {
+                requestAnimationFrame(draw);
+
+                analyser.getByteFrequencyData(dataArray);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                for (let i = 0; i < dataArray.length; i++) {
+                    const barHeight = dataArray[i] / 2;
+                    ctx.fillRect(i * 2, canvas.height - barHeight, 1, barHeight);
+                }
+            }
+
+            draw();
+        }
+    </script>```
+
+</body>
+</html>
