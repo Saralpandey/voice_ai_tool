@@ -7,8 +7,5 @@ numpy
 openai-whisper
 ffmpeg-python
 noisereduce
-deepgram-sdk
-dotenv
-tempfile
 pydub
 pydoc
