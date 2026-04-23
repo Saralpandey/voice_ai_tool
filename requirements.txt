@@ -1,11 +1,9 @@
-﻿fastapi
+fastapi
 uvicorn
 python-dotenv
 groq
 gtts
 numpy
 openai-whisper
+torch
 ffmpeg-python
-noisereduce
-pydub
-pyaudioop
